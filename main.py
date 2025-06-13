@@ -17,6 +17,8 @@ print("[INFO] Starting server initialization...")
 JINA_API_KEY = "jina_70a5793453b54df79e9cac3be028b8d6oWwMsK6SCTd-3EFSjAZMgDRnZBPf"
 JINA_API_URL = "https://api.jina.ai/v1/embeddings"
 JINA_MODEL = "jina-clip-v2"
+AIPIPE_API_KEY = "eyJhbGciOiJIUzI1NiJ9.eyJlbWFpbCI6IjI0ZjIwMDE0OTlAZHMuc3R1ZHkuaWl0bS5hYy5pbiJ9.pjDLSX8DwPmGkdOAQSSeHuPcM4M8XVjErw80zQumoVs"
+AIPIPE_CHAT_URL = "https://aipipe.org/openrouter/v1/chat/completions"
 
 headers = {
     "Authorization": f"Bearer {JINA_API_KEY}",
@@ -56,6 +58,33 @@ def get_image_embedding(image_b64):
         print(f"[ERROR] Jina API response: {response.text}")
         raise
     return np.array(response.json()["data"][0]["embedding"], dtype=np.float32)
+
+def call_aipipe_chat_api(question, context_docs):
+    # Compose a prompt with context
+    context = "\n\n".join(context_docs)
+    prompt = f"You are a helpful assistant for the IIT Madras TDS course. Use the following context to answer the user's question as accurately as possible.\n\nContext:\n{context}\n\nQuestion: {question}\nAnswer:"
+    payload = {
+        "model": "gpt-4o-mini", 
+        "messages": [
+            {"role": "system", "content": "You are a helpful assistant for the IIT Madras TDS course."},
+            {"role": "user", "content": prompt}
+        ]
+    }
+    headers = {
+        "Authorization": f"Bearer {AIPIPE_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    response = requests.post(AIPIPE_CHAT_URL, headers=headers, json=payload)
+    try:
+        response.raise_for_status()
+    except requests.HTTPError:
+        print(f"[ERROR] aipipe.org API response: {response.text}")
+        raise
+    data = response.json()
+    # Extract answer from response
+    if "choices" in data and data["choices"]:
+        return data["choices"][0]["message"]["content"].strip()
+    return "No answer generated."
 
 # --- Load embeddings from JSON files ---
 def load_embeddings_from_json(json_path):
@@ -148,7 +177,8 @@ async def query_with_image(request: QueryWithImageRequest):
         D, I = index.search(query_emb, k)
         docs = [all_documents[idx] for idx in I[0]]
         metas = [all_metadatas[idx] for idx in I[0]]
-        answer = docs[0][:400] if docs else "No relevant answer found."
+        # Use the top 3 docs as context for LLM
+        answer = call_aipipe_chat_api(request.question, docs)
         links = []
         for meta in metas:
             url = meta.get('original_url') or meta.get('url')

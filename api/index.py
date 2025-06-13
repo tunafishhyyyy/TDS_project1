@@ -13,6 +13,20 @@ import time
 import requests
 import glob
 
+GITHUB_BASE_URL = "https://raw.githubusercontent.com/tunafishhyyyy/TDS_project1_static/refs/heads/main/"
+
+JSON_FILES = [
+    "CourseContentData.json",
+    "discourse_posts_part1.json",
+    "discourse_posts_part2.json",
+    "discourse_posts_part3.json",
+    "discourse_posts_part4.json",
+    "discourse_posts_part5.json",
+    "discourse_posts_part6.json",
+    "discourse_posts_part7.json",
+    "discourse_posts_part8.json",
+]
+
 # --- Config ---
 print("[INFO] Starting server initialization...", file=sys.stderr)
 
@@ -91,46 +105,38 @@ def call_aipipe_chat_api(question, context_docs):
     return "No answer generated."
 
 # --- Load embeddings from JSON files ---
-def load_embeddings_from_json(json_path):
-    # Use absolute path relative to the api directory (same as this file)
-    abs_path = os.path.join(os.path.dirname(__file__), json_path)
-    print(f"[INFO] Loading embeddings from {abs_path} ...", file=sys.stderr)
-    with open(abs_path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    if isinstance(data, dict) and 'embeddings' in data:
-        data = data['embeddings']
-    embeddings = [item['embedding'] for item in data if 'embedding' in item]
-    documents = [item.get('text', item.get('document', '')) for item in data]
-    metadatas = [item.get('metadata', {}) for item in data]
-    print(f"[INFO] {len(embeddings)} embeddings loaded from {json_path}.", file=sys.stderr)
-    return embeddings, documents, metadatas
+def load_json_from_github(filename):
+    url = GITHUB_BASE_URL + filename
+    response = requests.get(url)
+    response.raise_for_status()
+    return response.json()
 
-# --- Load all embeddings and metadata ---
+# Load all embeddings from GitHub
+embedding_data = {}
+for fname in JSON_FILES:
+    try:
+        embedding_data[fname] = load_json_from_github(fname)
+        print(f"[INFO] Loaded {fname} from GitHub.")
+    except Exception as e:
+        print(f"[WARN] Could not load {fname} from GitHub: {e}")
+
+if not embedding_data:
+    raise RuntimeError("No embeddings loaded!")
+
+# --- Build all embeddings and metadata from GitHub data ---
 all_embeddings = []
 all_documents = []
 all_metadatas = []
 start_embed = time.time()
-# Load CourseContentData.json as before
-for json_file in ["CourseContentData.json"]:
-    try:
-        embeddings, documents, metadatas = load_embeddings_from_json(json_file)
-        if embeddings:
-            all_embeddings.extend(embeddings)
-            all_documents.extend(documents)
-            all_metadatas.extend(metadatas)
-    except Exception as e:
-        print(f"[WARN] Could not load {json_file}: {e}", file=sys.stderr)
-# Load all discourse_posts_part*.json files
-for json_file in glob.glob(os.path.join(os.path.dirname(__file__), "discourse_posts_part*.json")):
-    try:
-        # Pass only the filename to loader (it will resolve to api dir)
-        embeddings, documents, metadatas = load_embeddings_from_json(os.path.basename(json_file))
-        if embeddings:
-            all_embeddings.extend(embeddings)
-            all_documents.extend(documents)
-            all_metadatas.extend(metadatas)
-    except Exception as e:
-        print(f"[WARN] Could not load {json_file}: {e}", file=sys.stderr)
+for fname, data in embedding_data.items():
+    # If the JSON has an 'embeddings' key, use it
+    if isinstance(data, dict) and 'embeddings' in data:
+        data = data['embeddings']
+    for item in data:
+        if 'embedding' in item:
+            all_embeddings.append(item['embedding'])
+            all_documents.append(item.get('text', item.get('document', '')))
+            all_metadatas.append(item.get('metadata', {}))
 
 if not all_embeddings:
     raise RuntimeError("No embeddings loaded!")

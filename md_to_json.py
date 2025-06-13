@@ -2,17 +2,19 @@ import os
 import json
 import re
 import torch
-import open_clip
 import numpy as np
+import open_clip
 
 # --- Config ---
 MD_DIR = "tds_pages_md"
 OUTPUT_JSON = "CourseContentData.json"
 
-# --- Load CLIP Model (text only) ---
+# --- Load OpenCLIP Model (text only) ---
 device = "cuda" if torch.cuda.is_available() else "cpu"
-model, _, preprocess = open_clip.create_model_and_transforms('ViT-B-32', pretrained='openai')
-tokenizer = open_clip.get_tokenizer('ViT-B-32')
+model, _, preprocess = open_clip.create_model_and_transforms(
+    'ViT-H-14', pretrained='laion2b_s32b_b79k'
+)
+tokenizer = open_clip.get_tokenizer('ViT-H-14')
 model = model.to(device).eval()
 
 def get_text_embedding(text):

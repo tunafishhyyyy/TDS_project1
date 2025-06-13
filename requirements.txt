@@ -1,6 +1,5 @@
 fastapi
 uvicorn
-chromadb
 open-clip-torch
 torch
 pillow

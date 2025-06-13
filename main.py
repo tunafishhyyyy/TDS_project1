@@ -6,22 +6,20 @@ from pydantic import BaseModel
 from typing import Optional, List
 from PIL import Image
 import torch
-import open_clip
 import faiss
 import json
 import time
+import open_clip
 
 # --- Config ---
 print("[INFO] Starting server initialization...")
 
-# --- Load CLIP Model ---
-start_model = time.time()
-print("[INFO] Loading OpenCLIP ViT-B-32 model (this may take a while if downloading weights)...")
 device = "cuda" if torch.cuda.is_available() else "cpu"
-model, _, preprocess = open_clip.create_model_and_transforms('ViT-B-32', pretrained='openai')
-tokenizer = open_clip.get_tokenizer('ViT-B-32')
+model, _, preprocess = open_clip.create_model_and_transforms(
+    'ViT-H-14', pretrained='laion2b_s32b_b79k'
+)
+tokenizer = open_clip.get_tokenizer('ViT-H-14')
 model = model.to(device).eval()
-print(f"[INFO] Model loaded in {time.time() - start_model:.2f} seconds.")
 
 # --- Load embeddings from JSON files ---
 def load_embeddings_from_json(json_path):

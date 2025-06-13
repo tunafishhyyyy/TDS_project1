@@ -162,6 +162,10 @@ uvicorn main:app --reload
   - If you expect the data to grow much larger (hundreds of MBs or more), you may need to consider sharding, disk-based vector DB, or filtering before loading.
 - `.gitignore` is set to exclude intermediate and large files except the main embedding JSONs.
 
+## Embeddings Storage Note
+
+**Important:** Due to Vercel's deployment size restrictions, all embedding files (e.g., `CourseContentData.json`, `discourse_posts_part*.json`) have been moved to a separate public GitHub repository: [TDS_project1_static](https://github.com/tunafishhyyyy/TDS_project1_static). The API dynamically loads these embeddings at runtime from the GitHub raw URLs, so no large embedding files are stored in this project repository. This allows for successful deployment on Vercel and keeps the main repo lightweight.
+
 ---
 
 **For any issues, check the debug output in the scripts for skipped or malformed files.**

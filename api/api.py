@@ -194,9 +194,10 @@ async def query_with_image(request: QueryWithImageRequest):
         answer = call_aipipe_chat_api(request.question, docs)
         print("[INFO] Answer generated and ready to return.", file=sys.stderr)
         links = []
-        for meta in metas:
+        for i, meta in enumerate(metas):
             url = meta.get('original_url') or meta.get('url')
-            text = meta.get('title') or meta.get('text') or "Related link"
+            # Always use the associated document text for the link text
+            text = docs[i]
             if url:
                 links.append(Link(url=url, text=text))
         return AnswerResponse(answer=answer, links=links[:3])

@@ -3,7 +3,7 @@ description: "TDS Virtual TA Project Sample (but not the actual evaluation) Ques
 providers:
   - id: https
     config:
-      url: https://app.example.com/api/ # Replace this with your API endpoint
+      url: http://127.0.0.1:8000/api/ # Replace this with your API endpoint
       method: POST
       headers:
         Content-Type: application/json

@@ -14,7 +14,7 @@ This project is an automated Q&A API for the IIT Madras Online Degree "Tools in 
    - All text data is embedded using the OpenCLIP ViT-B-32 model with OpenAI weights, ensuring consistency between offline (data prep) and online (API query) embeddings.
 
 3. **Vector Database**
-   - Embeddings and metadata are stored in-memory using ChromaDB for fast similarity search.
+   - Embeddings and metadata are stored in-memory using **FAISS** for fast similarity search. (Previously ChromaDB, now replaced due to performance issues on Windows.)
 
 4. **API**
    - A FastAPI app exposes a `/api/` endpoint that accepts a question and optional base64 image, computes embeddings, retrieves relevant content, and returns an answer with supporting links.
@@ -29,7 +29,7 @@ This project is an automated Q&A API for the IIT Madras Online Degree "Tools in 
 
 - fastapi
 - uvicorn
-- chromadb
+- faiss-cpu  # (in-memory vector search)
 - open-clip-torch
 - torch
 - pillow
@@ -77,7 +77,8 @@ uvicorn main:app --reload
 
 **Note:**
 
-- **Server startup may take some time** (up to a few minutes on first run or on resource-constrained machines). This is because the OpenCLIP ViT-B-32 model weights must be loaded into memory and all embeddings from the JSON files are loaded into the in-memory vector database for fast search.
+- **Server startup may take some time** (up to a few minutes on first run or on resource-constrained machines). This is because the OpenCLIP ViT-B-32 model weights must be loaded into memory and all embeddings from the JSON files are loaded into the in-memory FAISS index for fast search.
+- **ChromaDB is no longer used.** All vector search is now handled by FAISS for maximum compatibility and speed, especially on Windows.
 
 ## API Usage
 

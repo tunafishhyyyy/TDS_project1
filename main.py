@@ -7,46 +7,62 @@ from typing import Optional, List
 from PIL import Image
 import torch
 import open_clip
-import chromadb
+import faiss
 import json
+import time
 
 # --- Config ---
-COLLECTION_NAME = "tds_collection"
+print("[INFO] Starting server initialization...")
 
 # --- Load CLIP Model ---
+start_model = time.time()
+print("[INFO] Loading OpenCLIP ViT-B-32 model (this may take a while if downloading weights)...")
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model, _, preprocess = open_clip.create_model_and_transforms('ViT-B-32', pretrained='openai')
 tokenizer = open_clip.get_tokenizer('ViT-B-32')
 model = model.to(device).eval()
-
-# --- Load ChromaDB (in-memory) ---
-client = chromadb.Client()  # In-memory only
-collection = client.get_or_create_collection(COLLECTION_NAME)
+print(f"[INFO] Model loaded in {time.time() - start_model:.2f} seconds.")
 
 # --- Load embeddings from JSON files ---
 def load_embeddings_from_json(json_path):
+    print(f"[INFO] Loading embeddings from {json_path} ...")
     with open(json_path, "r", encoding="utf-8") as f:
         data = json.load(f)
-    # Support both list of dicts and dict with 'embeddings' key
     if isinstance(data, dict) and 'embeddings' in data:
         data = data['embeddings']
-    ids = [str(i) for i in range(len(data))]
     embeddings = [item['embedding'] for item in data if 'embedding' in item]
     documents = [item.get('text', item.get('document', '')) for item in data]
     metadatas = [item.get('metadata', {}) for item in data]
-    return ids, embeddings, documents, metadatas
+    print(f"[INFO] {len(embeddings)} embeddings loaded from {json_path}.")
+    return embeddings, documents, metadatas
 
-# Load all embeddings (add your JSON files here)
-total_embedded = 0
-for json_file in ["CourseContentData.json", "discourse_posts.json", "ts_book.json"]:
+# --- Load all embeddings and metadata ---
+all_embeddings = []
+all_documents = []
+all_metadatas = []
+start_embed = time.time()
+for json_file in ["CourseContentData.json", "discourse_posts.json"]:
     try:
-        ids, embeddings, documents, metadatas = load_embeddings_from_json(json_file)
+        embeddings, documents, metadatas = load_embeddings_from_json(json_file)
         if embeddings:
-            collection.add(ids=ids, embeddings=embeddings, documents=documents, metadatas=metadatas)
-            total_embedded += len(embeddings)
+            all_embeddings.extend(embeddings)
+            all_documents.extend(documents)
+            all_metadatas.extend(metadatas)
     except Exception as e:
-        pass  # Ignore missing files or bad formats
-print(f"[INFO] Loaded {total_embedded} embeddings into ChromaDB collection '{COLLECTION_NAME}'")
+        print(f"[WARN] Could not load {json_file}: {e}")
+
+if not all_embeddings:
+    raise RuntimeError("No embeddings loaded!")
+
+embeddings_np = np.array(all_embeddings, dtype='float32')
+# Normalize for cosine similarity
+faiss.normalize_L2(embeddings_np)
+dim = embeddings_np.shape[1]
+index = faiss.IndexFlatIP(dim)
+index.add(embeddings_np)
+print(f"[INFO] Loaded {len(all_embeddings)} embeddings into FAISS index in {time.time() - start_embed:.2f} seconds.")
+
+print("[INFO] FastAPI app initialization starting...")
 
 # --- FastAPI Setup ---
 app = FastAPI()
@@ -98,16 +114,13 @@ async def query_with_image(request: QueryWithImageRequest):
                 raise HTTPException(status_code=400, detail="Invalid base64 image data")
         txt_emb = get_text_embedding(request.question)
         query_emb = combine_embeddings(img_emb, txt_emb)
-
-        # Query ChromaDB
-        results = collection.query(
-            query_embeddings=[query_emb.tolist()],
-            n_results=3,
-            include=["metadatas", "documents"]
-        )
-        # Compose answer from top document(s)
-        docs = results['documents'][0]
-        metas = results['metadatas'][0]
+        # Normalize query embedding for cosine similarity
+        query_emb = query_emb.reshape(1, -1)
+        faiss.normalize_L2(query_emb)
+        k = 3
+        D, I = index.search(query_emb, k)
+        docs = [all_documents[idx] for idx in I[0]]
+        metas = [all_metadatas[idx] for idx in I[0]]
         answer = docs[0][:400] if docs else "No relevant answer found."
         links = []
         for meta in metas:

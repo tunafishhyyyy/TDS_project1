@@ -11,7 +11,6 @@ import faiss
 import json
 import time
 import requests
-import glob
 
 GITHUB_BASE_URL = "https://raw.githubusercontent.com/tunafishhyyyy/TDS_project1_static/refs/heads/main/"
 
@@ -105,6 +104,8 @@ def call_aipipe_chat_api(question, context_docs):
     return "No answer generated."
 
 # --- Load embeddings from JSON files ---
+# Removed: load_embeddings_from_json and local file loading logic
+
 def load_json_from_github(filename):
     url = GITHUB_BASE_URL + filename
     response = requests.get(url)

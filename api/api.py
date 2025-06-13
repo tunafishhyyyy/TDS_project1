@@ -11,6 +11,7 @@ import faiss
 import json
 import time
 import requests
+from fastapi.middleware.cors import CORSMiddleware
 
 GITHUB_BASE_URL = "https://raw.githubusercontent.com/tunafishhyyyy/TDS_project1_static/refs/heads/main/"
 
@@ -152,6 +153,15 @@ print(f"[INFO] Loaded {len(all_embeddings)} embeddings into FAISS index in {time
 print("[INFO] FastAPI app initialization starting...", file=sys.stderr)
 
 app = FastAPI()
+
+# Enable CORS for all origins (adjust as needed for production)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class QueryWithImageRequest(BaseModel):
     question: str

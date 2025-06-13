@@ -10,9 +10,10 @@ import json
 import time
 import requests
 import glob
+import sys
 
 # --- Config ---
-print("[INFO] Starting server initialization...")
+print("[INFO] Starting server initialization...", file=sys.stderr)
 
 JINA_API_KEY = "jina_70a5793453b54df79e9cac3be028b8d6oWwMsK6SCTd-3EFSjAZMgDRnZBPf"
 JINA_API_URL = "https://api.jina.ai/v1/embeddings"
@@ -26,6 +27,7 @@ headers = {
 }
 
 def get_text_embedding(text):
+    print(f"[INFO] Requesting text embedding (length={len(text)})...", file=sys.stderr)
     data = {
         "input": [{"text": text}],
         "model": JINA_MODEL
@@ -36,9 +38,11 @@ def get_text_embedding(text):
     except requests.HTTPError:
         print(f"[ERROR] Jina API response: {response.text}")
         raise
+    print("[INFO] Received text embedding.", file=sys.stderr)
     return np.array(response.json()["data"][0]["embedding"], dtype=np.float32)
 
 def get_image_embedding(image_b64):
+    print("[INFO] Requesting image embedding...", file=sys.stderr)
     # Decode base64 image
     image_bytes = base64.b64decode(image_b64)
     image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
@@ -57,9 +61,11 @@ def get_image_embedding(image_b64):
     except requests.HTTPError:
         print(f"[ERROR] Jina API response: {response.text}")
         raise
+    print("[INFO] Received image embedding.", file=sys.stderr)
     return np.array(response.json()["data"][0]["embedding"], dtype=np.float32)
 
 def call_aipipe_chat_api(question, context_docs):
+    print("[INFO] Calling aipipe.org LLM API for answer generation...", file=sys.stderr)
     # Compose a prompt with context
     context = "\n\n".join(context_docs)
     prompt = f"You are a helpful assistant for the IIT Madras TDS course. Use the following context to answer the user's question as accurately as possible.\n\nContext:\n{context}\n\nQuestion: {question}\nAnswer:"
@@ -81,6 +87,7 @@ def call_aipipe_chat_api(question, context_docs):
         print(f"[ERROR] aipipe.org API response: {response.text}")
         raise
     data = response.json()
+    print("[INFO] Received answer from LLM API.", file=sys.stderr)
     # Extract answer from response
     if "choices" in data and data["choices"]:
         return data["choices"][0]["message"]["content"].strip()
@@ -169,16 +176,19 @@ def get_query_embedding(text, image_b64=None):
 
 @app.post("/api/", response_model=AnswerResponse)
 async def query_with_image(request: QueryWithImageRequest):
+    print(f"[INFO] Received API request: question='{request.question[:50]}...' image={'yes' if request.image else 'no'}", file=sys.stderr)
     try:
         query_emb = get_query_embedding(request.question, request.image)
+        print("[INFO] Query embedding computed.", file=sys.stderr)
         query_emb = query_emb.reshape(1, -1)
         faiss.normalize_L2(query_emb)
         k = 3
         D, I = index.search(query_emb, k)
+        print(f"[INFO] Top {k} documents retrieved from FAISS.", file=sys.stderr)
         docs = [all_documents[idx] for idx in I[0]]
         metas = [all_metadatas[idx] for idx in I[0]]
-        # Use the top 3 docs as context for LLM
         answer = call_aipipe_chat_api(request.question, docs)
+        print("[INFO] Answer generated and ready to return.", file=sys.stderr)
         links = []
         for meta in metas:
             url = meta.get('original_url') or meta.get('url')
@@ -187,8 +197,10 @@ async def query_with_image(request: QueryWithImageRequest):
                 links.append(Link(url=url, text=text))
         return AnswerResponse(answer=answer, links=links[:3])
     except Exception as e:
+        print(f"[ERROR] Exception in /api/: {e}", file=sys.stderr)
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/")
 def root():
+    print("[INFO] Root endpoint hit.", file=sys.stderr)
     return {"message": "Multimodal RAG API is running!"}

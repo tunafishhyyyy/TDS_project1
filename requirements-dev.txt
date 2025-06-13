@@ -1,0 +1,5 @@
+-r requirements.txt
+markdownify
+playwright
+beautifulsoup4
+uvicorn

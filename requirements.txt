@@ -1,10 +1,6 @@
 fastapi
-uvicorn
 faiss-cpu
 pillow
 numpy
 pydantic
-markdownify
-playwright
 requests
-beautifulsoup4

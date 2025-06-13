@@ -31,23 +31,36 @@ This project is an automated Q&A API for the IIT Madras Online Degree "Tools in 
 
 ## Libraries Used
 
+Production (API):
+
 - fastapi
-- uvicorn
 - faiss-cpu  # (in-memory vector search)
 - pillow      # (for image processing)
 - numpy
 - pydantic
-- markdownify
-- playwright
 - requests    # (for Jina AI API calls)
-- beautifulsoup4 (for HTML to text in Discourse posts)
+
+Development only:
+
+- uvicorn         # (for local dev server)
+- markdownify     # (for markdown to text conversion)
+- playwright      # (for scraping course content)
+- beautifulsoup4  # (for HTML to text in Discourse posts)
 
 ## Data Pipeline & Commands
 
 ### 1. Install dependencies
 
+For production (deployment):
+
 ```powershell
 pip install -r requirements.txt
+```
+
+For development (local dev, scraping, etc):
+
+```powershell
+pip install -r requirements-dev.txt
 playwright install
 ```
 

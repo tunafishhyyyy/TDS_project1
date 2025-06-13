@@ -82,3 +82,4 @@ Thumbs.db
 !CourseContentData.json
 !discourse_posts.json
 !discourse_posts_part*.json
+!vercel.json

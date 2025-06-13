@@ -1,3 +1,4 @@
+import os
 import sys
 import io
 import base64
@@ -19,7 +20,7 @@ JINA_API_KEY = "jina_70a5793453b54df79e9cac3be028b8d6oWwMsK6SCTd-3EFSjAZMgDRnZBP
 JINA_API_URL = "https://api.jina.ai/v1/embeddings"
 JINA_MODEL = "jina-clip-v2"
 AIPIPE_API_KEY = "eyJhbGciOiJIUzI1NiJ9.eyJlbWFpbCI6IjI0ZjIwMDE0OTlAZHMuc3R1ZHkuaWl0bS5hYy5pbiJ9.pjDLSX8DwPmGkdOAQSSeHuPcM4M8XVjErw80zQumoVs"
-AIPIPE_CHAT_URL = "https://api.aipipe.org/v1/chat/completions"
+AIPIPE_CHAT_URL = "https://aipipe.org/openrouter/v1/chat/completions"
 
 headers = {
     "Authorization": f"Bearer {JINA_API_KEY}",
@@ -91,8 +92,10 @@ def call_aipipe_chat_api(question, context_docs):
 
 # --- Load embeddings from JSON files ---
 def load_embeddings_from_json(json_path):
-    print(f"[INFO] Loading embeddings from {json_path} ...", file=sys.stderr)
-    with open(json_path, "r", encoding="utf-8") as f:
+    # Use absolute path relative to the api directory (same as this file)
+    abs_path = os.path.join(os.path.dirname(__file__), json_path)
+    print(f"[INFO] Loading embeddings from {abs_path} ...", file=sys.stderr)
+    with open(abs_path, "r", encoding="utf-8") as f:
         data = json.load(f)
     if isinstance(data, dict) and 'embeddings' in data:
         data = data['embeddings']
@@ -107,6 +110,7 @@ all_embeddings = []
 all_documents = []
 all_metadatas = []
 start_embed = time.time()
+# Load CourseContentData.json as before
 for json_file in ["CourseContentData.json"]:
     try:
         embeddings, documents, metadatas = load_embeddings_from_json(json_file)
@@ -116,9 +120,11 @@ for json_file in ["CourseContentData.json"]:
             all_metadatas.extend(metadatas)
     except Exception as e:
         print(f"[WARN] Could not load {json_file}: {e}", file=sys.stderr)
-for json_file in glob.glob("discourse_posts_part*.json"):
+# Load all discourse_posts_part*.json files
+for json_file in glob.glob(os.path.join(os.path.dirname(__file__), "discourse_posts_part*.json")):
     try:
-        embeddings, documents, metadatas = load_embeddings_from_json(json_file)
+        # Pass only the filename to loader (it will resolve to api dir)
+        embeddings, documents, metadatas = load_embeddings_from_json(os.path.basename(json_file))
         if embeddings:
             all_embeddings.extend(embeddings)
             all_documents.extend(documents)

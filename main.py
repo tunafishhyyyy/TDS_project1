@@ -5,21 +5,57 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List
 from PIL import Image
-import torch
 import faiss
 import json
 import time
-import open_clip
+import requests
+import glob
 
 # --- Config ---
 print("[INFO] Starting server initialization...")
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
-model, _, preprocess = open_clip.create_model_and_transforms(
-    'ViT-H-14', pretrained='laion2b_s32b_b79k'
-)
-tokenizer = open_clip.get_tokenizer('ViT-H-14')
-model = model.to(device).eval()
+JINA_API_KEY = "jina_70a5793453b54df79e9cac3be028b8d6oWwMsK6SCTd-3EFSjAZMgDRnZBPf"
+JINA_API_URL = "https://api.jina.ai/v1/embeddings"
+JINA_MODEL = "jina-clip-v2"
+
+headers = {
+    "Authorization": f"Bearer {JINA_API_KEY}",
+    "Content-Type": "application/json"
+}
+
+def get_text_embedding(text):
+    data = {
+        "input": [{"text": text}],
+        "model": JINA_MODEL
+    }
+    response = requests.post(JINA_API_URL, headers=headers, json=data)
+    try:
+        response.raise_for_status()
+    except requests.HTTPError:
+        print(f"[ERROR] Jina API response: {response.text}")
+        raise
+    return np.array(response.json()["data"][0]["embedding"], dtype=np.float32)
+
+def get_image_embedding(image_b64):
+    # Decode base64 image
+    image_bytes = base64.b64decode(image_b64)
+    image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    # Convert to bytes for API
+    buffered = io.BytesIO()
+    image.save(buffered, format="PNG")
+    img_bytes = buffered.getvalue()
+    img_b64 = base64.b64encode(img_bytes).decode()
+    data = {
+        "input": [{"image": img_b64}],
+        "model": JINA_MODEL
+    }
+    response = requests.post(JINA_API_URL, headers=headers, json=data)
+    try:
+        response.raise_for_status()
+    except requests.HTTPError:
+        print(f"[ERROR] Jina API response: {response.text}")
+        raise
+    return np.array(response.json()["data"][0]["embedding"], dtype=np.float32)
 
 # --- Load embeddings from JSON files ---
 def load_embeddings_from_json(json_path):
@@ -39,7 +75,18 @@ all_embeddings = []
 all_documents = []
 all_metadatas = []
 start_embed = time.time()
-for json_file in ["CourseContentData.json", "discourse_posts.json"]:
+# Load CourseContentData.json as before
+for json_file in ["CourseContentData.json"]:
+    try:
+        embeddings, documents, metadatas = load_embeddings_from_json(json_file)
+        if embeddings:
+            all_embeddings.extend(embeddings)
+            all_documents.extend(documents)
+            all_metadatas.extend(metadatas)
+    except Exception as e:
+        print(f"[WARN] Could not load {json_file}: {e}")
+# Load all discourse_posts_part*.json files
+for json_file in glob.glob("discourse_posts_part*.json"):
     try:
         embeddings, documents, metadatas = load_embeddings_from_json(json_file)
         if embeddings:
@@ -77,42 +124,24 @@ class AnswerResponse(BaseModel):
     answer: str
     links: List[Link]
 
-def get_image_embedding(image_bytes):
-    image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-    image_tensor = preprocess(image).unsqueeze(0).to(device)
-    with torch.no_grad():
-        image_emb = model.encode_image(image_tensor)
-        image_emb = image_emb / image_emb.norm(dim=-1, keepdim=True)
-    return image_emb.cpu().numpy().astype(np.float32)[0]
-
-def get_text_embedding(text):
-    text_tokens = tokenizer([text]).to(device)
-    with torch.no_grad():
-        text_emb = model.encode_text(text_tokens)
-        text_emb = text_emb / text_emb.norm(dim=-1, keepdim=True)
-    return text_emb.cpu().numpy().astype(np.float32)[0]
-
-def combine_embeddings(img_emb, txt_emb):
-    if img_emb is not None and txt_emb is not None:
-        return ((img_emb + txt_emb) / 2).astype(np.float32)
-    elif img_emb is not None:
-        return img_emb.astype(np.float32)
+def get_query_embedding(text, image_b64=None):
+    txt_emb = get_text_embedding(text)
+    if image_b64:
+        try:
+            img_emb = get_image_embedding(image_b64)
+            # Combine text and image embeddings (average)
+            emb = (txt_emb + img_emb) / 2
+        except Exception as e:
+            print(f"[WARN] Image embedding failed: {e}. Using text only.")
+            emb = txt_emb
     else:
-        return txt_emb.astype(np.float32)
+        emb = txt_emb
+    return emb.astype(np.float32)
 
 @app.post("/api/", response_model=AnswerResponse)
 async def query_with_image(request: QueryWithImageRequest):
     try:
-        img_emb = None
-        if request.image:
-            try:
-                image_bytes = base64.b64decode(request.image)
-                img_emb = get_image_embedding(image_bytes)
-            except Exception:
-                raise HTTPException(status_code=400, detail="Invalid base64 image data")
-        txt_emb = get_text_embedding(request.question)
-        query_emb = combine_embeddings(img_emb, txt_emb)
-        # Normalize query embedding for cosine similarity
+        query_emb = get_query_embedding(request.question, request.image)
         query_emb = query_emb.reshape(1, -1)
         faiss.normalize_L2(query_emb)
         k = 3

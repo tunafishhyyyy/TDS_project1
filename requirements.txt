@@ -1,10 +1,10 @@
 fastapi
 uvicorn
-open-clip-torch
-torch
+faiss-cpu
 pillow
 numpy
 pydantic
 markdownify
 playwright
-faiss-cpu
+requests
+beautifulsoup4

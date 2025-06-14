@@ -18,6 +18,8 @@ This end-to-end multimodal support enables richer, more accurate retrieval and a
 
 ## Approach
 
+This project is designed for both local and cloud/serverless deployment, and is currently deployed on [Vercel](https://vercel.com/). The API loads all embeddings at runtime from a public GitHub repo, making it lightweight and suitable for serverless environments.
+
 1. **Data Extraction**
     - Course content is scraped as Markdown files using Playwright and converted to JSON with embeddings.
     - Discourse forum posts are downloaded as JSON and converted to a unified format with embeddings.
@@ -30,6 +32,7 @@ This end-to-end multimodal support enables richer, more accurate retrieval and a
     - In-memory storage is used for all embeddings. With 10 files of ~8 MB each (~80 MB total), this is efficient and serverless-friendly.
 4. **API**
     - A FastAPI app exposes a `/api/` endpoint that accepts a question and optional base64 image, computes embeddings (using Jina AI), retrieves relevant content, and returns an answer with supporting links.
+    - The API is deployed on Vercel for public access and serverless scalability.
 
 ## Models Used
 
@@ -84,12 +87,23 @@ python .\md_to_json.py
 
 ### 3. Download and prepare Discourse forum data (with multiprocessing)
 
+To download Discourse forum data, you must first authenticate using your browser cookies. Use the following workflow:
+
 ```powershell
-python .\discourse_dld.py   # Requires your Discourse cookies for access
-python .\discourse_to_json.py
+python .\get_discourse_cookie.py  # Automates login and updates .env with all cookies
+```
+
+- This will open a browser window for you to log in. After login, the script will save all cookies to `.env` as `DISCOURSE_COOKIE=...`.
+
+Then, run the data download and conversion scripts:
+
+```powershell
+python .\discourse_dld.py         # Uses the cookies in .env for authenticated scraping
+python .\discourse_to_json.py     # Converts raw forum data to embedding format
 ```
 
 - Downloads forum topics to `discourse_json/` and converts to multiple partial files (e.g., `discourse_posts_part1.json`, `discourse_posts_part2.json`, etc.) with multimodal embeddings. No need to merge these files manually.
+- If you get a 403 error, re-run `get_discourse_cookie.py` to refresh your cookies.
 
 **Note:** To run `discourse_dld.py`, you must add your Discourse session cookie for authentication. This is required to access and scrape posts from the Discourse course page.
 
@@ -195,15 +209,17 @@ export DISCOURSE_COOKIE="your-discourse-cookie"
 
 Discourse authentication may require more than just the `_forum_session` cookie. To ensure maximum compatibility, this project supports using the full browser cookie string for authenticated requests.
 
-#### Recommended workflow:
+#### Recommended workflow
 
 1. Run `python get_discourse_cookie.py`. This will open a browser window.
 2. Log in to Discourse with Google in the browser window. Complete any 2FA or CAPTCHA if prompted.
 3. After you are fully logged in and see the Discourse forum page, return to the terminal and press Enter.
 4. The script will extract **all cookies** from your browser session and write them to your `.env` file as a single line:
+
    ```
    DISCOURSE_COOKIE=gcl_au=...; _ga=...; ...; _forum_session=...; ...
    ```
+
 5. The `discourse_dld.py` script will automatically read this value from `.env`, parse all cookies, and use them for requests. This mimics browser behavior and avoids 403 errors.
 
 - You do **not** need to manually copy-paste cookies from your browser; the script automates this.
@@ -211,6 +227,32 @@ Discourse authentication may require more than just the `_forum_session` cookie.
 - If you want to use a different account, log out in the browser window before running the script.
 
 **Note:**
+
+- The cookie string should be in the exact format as seen in your browser's request headers (e.g., `name1=value1; name2=value2; ...`).
+- The script will parse and use all cookies, not just `_forum_session`.
+- This approach is robust to SSO, CSRF, and other authentication mechanisms that require multiple cookies.
+
+**Discourse Cookie Automation:**
+
+To make authentication easy and robust, use the provided `get_discourse_cookie.py` script:
+
+1. Run `python get_discourse_cookie.py`. This will open a browser window.
+2. Log in to Discourse with Google in the browser window. Complete any 2FA or CAPTCHA if prompted.
+3. After you are fully logged in and see the Discourse forum page, return to the terminal and press Enter.
+4. The script will extract **all cookies** from your browser session and write them to your `.env` file as a single line:
+
+   ```
+   DISCOURSE_COOKIE=name1=value1; name2=value2; ...; _forum_session=...; ...
+   ```
+
+5. The `discourse_dld.py` script will automatically read this value from `.env`, parse all cookies, and use them for requests. This mimics browser behavior and avoids 403 errors.
+
+- You do **not** need to manually copy-paste cookies from your browser; the script automates this.
+- If you ever get a 403 error, repeat the above process to refresh your cookies.
+- If you want to use a different account, log out in the browser window before running the script.
+
+**Note:**
+
 - The cookie string should be in the exact format as seen in your browser's request headers (e.g., `name1=value1; name2=value2; ...`).
 - The script will parse and use all cookies, not just `_forum_session`.
 - This approach is robust to SSO, CSRF, and other authentication mechanisms that require multiple cookies.
@@ -337,3 +379,4 @@ Pass Rate: 50.00%
 Duration: 2s (concurrency: 4)
 
 Done.
+```

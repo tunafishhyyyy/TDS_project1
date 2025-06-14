@@ -99,8 +99,8 @@ python .\discourse_to_json.py
 uvicorn main:app --reload
 ```
 
-- The API will be available at [http://127.0.0.1:8000/](http://127.0.0.1:8000/)
-- Test with Swagger UI at [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+- The API will be available at [http://127.0.0.1:8000/](http://127.0.0.1:8000/) when running locally.
+- When deployed, the API will be available at your Vercel deployment URL, e.g. `https://your-vercel-project.vercel.app/api/` (replace with your actual Vercel URL).
 
 **Note:**
 
@@ -188,6 +188,32 @@ export JINA_API_KEY="your-jina-key"
 export AIPIPE_API_KEY="your-aipipe-key"
 export DISCOURSE_COOKIE="your-discourse-cookie"
 ```
+
+## Discourse Cookie Handling (Full Browser Cookie Support)
+
+### How to get and use your Discourse cookies for scraping
+
+Discourse authentication may require more than just the `_forum_session` cookie. To ensure maximum compatibility, this project supports using the full browser cookie string for authenticated requests.
+
+#### Recommended workflow:
+
+1. Run `python get_discourse_cookie.py`. This will open a browser window.
+2. Log in to Discourse with Google in the browser window. Complete any 2FA or CAPTCHA if prompted.
+3. After you are fully logged in and see the Discourse forum page, return to the terminal and press Enter.
+4. The script will extract **all cookies** from your browser session and write them to your `.env` file as a single line:
+   ```
+   DISCOURSE_COOKIE=gcl_au=...; _ga=...; ...; _forum_session=...; ...
+   ```
+5. The `discourse_dld.py` script will automatically read this value from `.env`, parse all cookies, and use them for requests. This mimics browser behavior and avoids 403 errors.
+
+- You do **not** need to manually copy-paste cookies from your browser; the script automates this.
+- If you ever get a 403 error, repeat the above process to refresh your cookies.
+- If you want to use a different account, log out in the browser window before running the script.
+
+**Note:**
+- The cookie string should be in the exact format as seen in your browser's request headers (e.g., `name1=value1; name2=value2; ...`).
+- The script will parse and use all cookies, not just `_forum_session`.
+- This approach is robust to SSO, CSRF, and other authentication mechanisms that require multiple cookies.
 
 ## Notes
 

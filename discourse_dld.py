@@ -19,7 +19,7 @@ CATEGORY_ID = 34
 START_DATE = "2025-01-01" # Inclusive
 END_DATE = "2025-04-15"   # Inclusive
 
-RAW_COOKIE_STRING = os.getenv("DISCOURSE_COOKIE", "")  # Set your Discourse session cookie in the DISCOURSE_COOKIE environment variable
+RAW_COOKIE_STRING = """gcl_au=1.1.120995190.1748788903; _ga=GA1.1.1924497078.1748788903; _fbp=fb.2.1748788903579.6526749566557956; _bypass_cache=true; _ga_5HTJMW67XK=GS2.1.s1749876452$o6$g0$t1749876459$j53$l0$h0; _ga_08NPRH5L4M=GS2.1.s1749876448$o24$g1$t1749876464$j44$l0$h0; _t=c%2FJmtwM8KlczmzzpC3JAr0mDVsfEsrOVQ%2F5wUyy3TwAqC4TVnSywYBu6C9su6XTGxHHPppOTcOrI1JTp3JawKGDD%2BxpDfIrCyBe7dEQeGKGsz7H7%2BJ0dAGegLxZJsVWMgayvgGzkwVsJocTJPiznOWz6NPoliMT2UpatEqca2LzwTQlQaUfEfB46Bo%2Bt4uciWE9FWF967nB%2B63aILdzIzfeHproiRUuy98%2FyxoXaTjUuZ%2BzcYUMtA4tmz2n%2FN4hTcoc%2BJ4D%2Fsz2shjMvizJ%2Bu8elrhtZmHbwDWbg0RTDs19XpG7mpmg4vJ87qNk%3D--5xsv5Eb6fAEZyae%2B--D85ZrBOPNDkZeWjtcvkESw%3D%3D; _forum_session=YY4wTK0DDop9F2HWSCY8N31uA5BYnoxwxonz6vuqHQlHmjC59ft545m0aONTXYvu7r69bryLAIn5yqch6Pbs0DeMeTYpC8hWKf9wRw0Pl02xd1%2BgbK%2FChCU8ovh8w1KFmYHyltp5qPvABPsBhfRHHvhn0KgVah3%2BxnEI%2FWuuBMflWsaLmUQZLH%2FGruoebMhEoKteRwe2o3%2BarQWWOFhtNfEjpHe%2F5FBEV12WojFzYUy%2FUGIYaAoGi3yU6GWM%2FlKFsvVt8CuMh%2FS6tZvVHmE1JqTMHF1otT3h0vEb8EFllhLJLRjEteef%2BW8zmJO2460l02Tngne3Cm5%2FmQmwCZuO98eJ1vM28C2%2Bn2B0160Xb6Q7IJ3EWNidWMmVOJLTEw%3D%3D--XCQYemVVp5Y8o7lV--TmbCAVrLpD%2FJuRxNo%2B%2FgNw%3D%3D""" 
 
 OUTPUT_DIR = "discourse_json"
 POST_ID_BATCH_SIZE = 50
@@ -30,15 +30,37 @@ MAX_CONSECUTIVE_PAGES_WITHOUT_NEW_TOPICS = 5 # New configuration for breaking lo
 def parse_cookie_string(raw_cookie_string):
     """Parses a raw cookie string into a dictionary."""
     cookies = {}
-    if not raw_cookie_string.strip():
-        print("Warning: RAW_COOKIE_STRING is empty. Requests might fail if authentication is needed.")
+    if not raw_cookie_string or not raw_cookie_string.strip():
         return cookies
-    for cookie_part in raw_cookie_string.strip().split(";"):
-        if "=" in cookie_part:
-            key, value = cookie_part.strip().split("=", 1)
+    for cookie_part in raw_cookie_string.strip().split(';'):
+        if '=' in cookie_part:
+            key, value = cookie_part.strip().split('=', 1)
             cookies[key] = value
     return cookies
 
+# Always read DISCOURSE_COOKIE from .env and use as a browser-style cookie string
+import os
+
+def get_env_var(key, env_path='.env'):
+    value = None
+    if os.path.exists(env_path):
+        with open(env_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.strip().startswith(f'{key}='):
+                    value = line.strip().split(f'{key}=', 1)[-1]
+    return value
+
+DISCOURSE_COOKIE_STRING = get_env_var('DISCOURSE_COOKIE')
+
+if DISCOURSE_COOKIE_STRING:
+    print(f"[FORCED] Using DISCOURSE_COOKIE from .env (browser format, length={len(DISCOURSE_COOKIE_STRING)})")
+else:
+    print("[ERROR] No DISCOURSE_COOKIE found in .env! Script may not work.")
+
+def get_cookies():
+    if DISCOURSE_COOKIE_STRING:
+        return parse_cookie_string(DISCOURSE_COOKIE_STRING)
+    return {}
 
 def get_topic_ids(base_url, category_slug, category_id, start_date_str, end_date_str, cookies):
     """Fetches topic IDs from a specific category within a date range."""

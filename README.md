@@ -4,6 +4,18 @@
 
 This project is an automated Q&A API for the IIT Madras Online Degree "Tools in Data Science" (TDS) course. It answers student questions using both course content and Discourse forum discussions, supporting true multimodal queries (text and optional image). The backend is built with FastAPI and uses in-memory vector search for fast retrieval.
 
+## What Makes This Project Truly Multimodal
+
+This project is truly multimodal because it natively supports both text and image data at every stage of the pipeline:
+
+- **Data Ingestion:** Both course content and forum posts are processed for text and images. Images are extracted and included alongside text for embedding.
+- **Embedding Generation:** The Jina AI `jina-clip-v2` model is used to generate embeddings for both text and images. If a data point contains both, their embeddings are averaged to create a single multimodal representation.
+- **Query Handling:** The API endpoint accepts both a text question and an optional image (as base64). When both are provided, the system computes embeddings for each and combines them, ensuring the query itself is multimodal.
+- **Retrieval:** All embeddings in the vector database are multimodal, so similarity search works seamlessly for text-only, image-only, or combined text+image queries.
+- **Answer Generation:** The retrieved context (which may be text, images, or both) is used to generate answers, making the system robust to multimodal information needs.
+
+This end-to-end multimodal support enables richer, more accurate retrieval and answer generation, going beyond traditional text-only Q&A systems.
+
 ## Approach
 
 1. **Data Extraction**

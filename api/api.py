@@ -39,10 +39,10 @@ JSON_FILES = [
 print("[INFO] Starting server initialization...", file=sys.stderr)
 
 # API keys and endpoints for embedding and LLM services
-JINA_API_KEY = "jina_70a5793453b54df79e9cac3be028b8d6oWwMsK6SCTd-3EFSjAZMgDRnZBPf"
+JINA_API_KEY = os.getenv("JINA_API_KEY", "")
 JINA_API_URL = "https://api.jina.ai/v1/embeddings"
 JINA_MODEL = "jina-clip-v2"
-AIPIPE_API_KEY = "eyJhbGciOiJIUzI1NiJ9.eyJlbWFpbCI6IjI0ZjIwMDE0OTlAZHMuc3R1ZHkuaWl0bS5hYy5pbiJ9.pjDLSX8DwPmGkdOAQSSeHuPcM4M8XVjErw80zQumoVs"
+AIPIPE_API_KEY = os.getenv("AIPIPE_API_KEY", "")
 AIPIPE_CHAT_URL = "https://aipipe.org/openrouter/v1/chat/completions"
 
 # Headers for Jina API requests

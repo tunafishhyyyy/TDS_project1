@@ -24,7 +24,7 @@ defaultTest:
         method: POST
         headers:
           Content-Type: application/json
-          Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJlbWFpbCI6IjI0ZjIwMDE0OTlAZHMuc3R1ZHkuaWl0bS5hYy5pbiJ9.pjDLSX8DwPmGkdOAQSSeHuPcM4M8XVjErw80zQumoVs  # Replace with your token
+          Authorization: Bearer ${AIPIPE_API_KEY}  # Set this environment variable with your token
         body: |
           {
             "model": "gpt-4o-mini",

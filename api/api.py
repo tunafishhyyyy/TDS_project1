@@ -163,6 +163,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.middleware("http")
+async def log_requests(request, call_next):
+    body = await request.body()
+    print(f"[REQUEST LOG] {request.method} {request.url} | Body: {body.decode('utf-8', errors='replace')}", file=sys.stderr)
+    response = await call_next(request)
+    return response
+
 class QueryWithImageRequest(BaseModel):
     question: str
     image: Optional[str] = None  # base64 string
@@ -196,7 +203,7 @@ async def query_with_image(request: QueryWithImageRequest):
         print("[INFO] Query embedding computed.", file=sys.stderr)
         query_emb = query_emb.reshape(1, -1)
         faiss.normalize_L2(query_emb)
-        k = 3
+        k = 5  # Retrieve top 5 documents instead of 3
         D, I = index.search(query_emb, k)
         print(f"[INFO] Top {k} documents retrieved from FAISS.", file=sys.stderr)
         docs = [all_documents[idx] for idx in I[0]]
@@ -206,11 +213,10 @@ async def query_with_image(request: QueryWithImageRequest):
         links = []
         for i, meta in enumerate(metas):
             url = meta.get('original_url') or meta.get('url')
-            # Always use the associated document text for the link text
             text = docs[i]
             if url:
                 links.append(Link(url=url, text=text))
-        return AnswerResponse(answer=answer, links=links[:3])
+        return AnswerResponse(answer=answer, links=links[:5])
     except Exception as e:
         print(f"[ERROR] Exception in /api/: {e}", file=sys.stderr)
         raise HTTPException(status_code=500, detail=str(e))

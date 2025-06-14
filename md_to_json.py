@@ -1,3 +1,10 @@
+"""
+md_to_json.py
+Purpose: Converts scraped course content Markdown files into a unified JSON format with multimodal embeddings for use in RAG systems.
+- Loads Markdown files, extracts text and images, computes embeddings using Jina AI, and outputs a single JSON file for downstream search/QA.
+- Handles both text and image content for each course page.
+"""
+
 import os
 import json
 import re

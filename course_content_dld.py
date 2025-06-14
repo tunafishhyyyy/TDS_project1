@@ -1,3 +1,10 @@
+"""
+course_content_dld.py
+Purpose: Scrapes course content pages from the TDS course website using Playwright, extracts article content, and saves it as Markdown files for downstream processing and embedding.
+- Recursively crawls all internal course links, extracts article HTML, converts to Markdown, and saves to disk.
+- Also collects metadata for each page.
+"""
+
 import os
 import json
 import re

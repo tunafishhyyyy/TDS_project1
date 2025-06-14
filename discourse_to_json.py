@@ -1,3 +1,10 @@
+"""
+discourse_to_json.py
+Purpose: Extracts, processes, and embeds Discourse forum posts as JSON for downstream use in retrieval-augmented generation (RAG) systems.
+- Loads Discourse topic JSON files, extracts post text and images, computes multimodal embeddings using Jina AI, and outputs embedding files for use in search/QA systems.
+- Supports multiprocessing for efficient processing of large datasets.
+"""
+
 import os
 import json
 import re

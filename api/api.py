@@ -1,3 +1,9 @@
+# api.py
+# Purpose: FastAPI backend for the TDS Virtual TA project. Provides a multimodal RAG (Retrieval-Augmented Generation) API for answering questions using course content and Discourse forum data.
+# - Loads embeddings from GitHub, builds a FAISS index, and exposes endpoints for question answering.
+# - Supports text and image queries, uses Jina AI for embeddings, and aipipe.org for LLM-based answer generation.
+# - Includes CORS and request logging middleware for debugging and cross-origin support.
+
 import os
 import sys
 import io
@@ -13,8 +19,10 @@ import time
 import requests
 from fastapi.middleware.cors import CORSMiddleware
 
+# Base URL for loading embeddings from GitHub
 GITHUB_BASE_URL = "https://raw.githubusercontent.com/tunafishhyyyy/TDS_project1_static/refs/heads/main/"
 
+# List of embedding JSON files to load
 JSON_FILES = [
     "CourseContentData.json",
     "discourse_posts_part1.json",
@@ -30,18 +38,21 @@ JSON_FILES = [
 # --- Config ---
 print("[INFO] Starting server initialization...", file=sys.stderr)
 
+# API keys and endpoints for embedding and LLM services
 JINA_API_KEY = "jina_70a5793453b54df79e9cac3be028b8d6oWwMsK6SCTd-3EFSjAZMgDRnZBPf"
 JINA_API_URL = "https://api.jina.ai/v1/embeddings"
 JINA_MODEL = "jina-clip-v2"
 AIPIPE_API_KEY = "eyJhbGciOiJIUzI1NiJ9.eyJlbWFpbCI6IjI0ZjIwMDE0OTlAZHMuc3R1ZHkuaWl0bS5hYy5pbiJ9.pjDLSX8DwPmGkdOAQSSeHuPcM4M8XVjErw80zQumoVs"
 AIPIPE_CHAT_URL = "https://aipipe.org/openrouter/v1/chat/completions"
 
+# Headers for Jina API requests
 headers = {
     "Authorization": f"Bearer {JINA_API_KEY}",
     "Content-Type": "application/json"
 }
 
 def get_text_embedding(text):
+    """Get text embedding from Jina AI cloud API."""
     print(f"[INFO] Requesting text embedding (length={len(text)})...", file=sys.stderr)
     data = {
         "input": [{"text": text}],
@@ -57,6 +68,7 @@ def get_text_embedding(text):
     return np.array(response.json()["data"][0]["embedding"], dtype=np.float32)
 
 def get_image_embedding(image_b64):
+    """Get image embedding from Jina AI cloud API using base64 image input."""
     print("[INFO] Requesting image embedding...", file=sys.stderr)
     image_bytes = base64.b64decode(image_b64)
     image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
@@ -78,6 +90,7 @@ def get_image_embedding(image_b64):
     return np.array(response.json()["data"][0]["embedding"], dtype=np.float32)
 
 def call_aipipe_chat_api(question, context_docs):
+    """Call the aipipe.org LLM API to generate an answer using the provided context."""
     print("[INFO] Calling aipipe.org LLM API for answer generation...", file=sys.stderr)
     context = "\n\n".join(context_docs)
     prompt = f"You are a helpful assistant for the IIT Madras TDS course. Use the following context to answer the user's question as accurately as possible.\n\nContext:\n{context}\n\nQuestion: {question}\nAnswer:"
@@ -104,16 +117,15 @@ def call_aipipe_chat_api(question, context_docs):
         return data["choices"][0]["message"]["content"].strip()
     return "No answer generated."
 
-# --- Load embeddings from JSON files ---
-# Removed: load_embeddings_from_json and local file loading logic
-
+# --- Load embeddings from GitHub ---
 def load_json_from_github(filename):
+    """Download and return JSON data from the specified GitHub file URL."""
     url = GITHUB_BASE_URL + filename
     response = requests.get(url)
     response.raise_for_status()
     return response.json()
 
-# Load all embeddings from GitHub
+# Load all embeddings from GitHub into memory
 embedding_data = {}
 for fname in JSON_FILES:
     try:
@@ -125,7 +137,7 @@ for fname in JSON_FILES:
 if not embedding_data:
     raise RuntimeError("No embeddings loaded!")
 
-# --- Build all embeddings and metadata from GitHub data ---
+# --- Build all embeddings, documents, and metadata from loaded data ---
 all_embeddings = []
 all_documents = []
 all_metadatas = []
@@ -143,6 +155,7 @@ for fname, data in embedding_data.items():
 if not all_embeddings:
     raise RuntimeError("No embeddings loaded!")
 
+# Convert embeddings to numpy array and build FAISS index
 embeddings_np = np.array(all_embeddings, dtype='float32')
 faiss.normalize_L2(embeddings_np)
 dim = embeddings_np.shape[1]
@@ -152,6 +165,7 @@ print(f"[INFO] Loaded {len(all_embeddings)} embeddings into FAISS index in {time
 
 print("[INFO] FastAPI app initialization starting...", file=sys.stderr)
 
+# Initialize FastAPI app
 app = FastAPI()
 
 # Enable CORS for all origins (adjust as needed for production)
@@ -163,6 +177,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Middleware to log all incoming requests for debugging
 @app.middleware("http")
 async def log_requests(request, call_next):
     body = await request.body()
@@ -170,6 +185,7 @@ async def log_requests(request, call_next):
     response = await call_next(request)
     return response
 
+# Request/response models for the API
 class QueryWithImageRequest(BaseModel):
     question: str
     image: Optional[str] = None  # base64 string
@@ -183,6 +199,7 @@ class AnswerResponse(BaseModel):
     links: List[Link]
 
 def get_query_embedding(text, image_b64=None):
+    """Get the embedding for a query, optionally combining text and image embeddings."""
     txt_emb = get_text_embedding(text)
     if image_b64:
         try:
@@ -195,6 +212,7 @@ def get_query_embedding(text, image_b64=None):
         emb = txt_emb
     return emb.astype(np.float32)
 
+# Main API endpoint for answering questions
 @app.post("/api/", response_model=AnswerResponse)
 async def query_with_image(request: QueryWithImageRequest):
     print(f"[INFO] Received API request: question='{request.question[:50]}...' image={'yes' if request.image else 'no'}", file=sys.stderr)
@@ -221,6 +239,7 @@ async def query_with_image(request: QueryWithImageRequest):
         print(f"[ERROR] Exception in /api/: {e}", file=sys.stderr)
         raise HTTPException(status_code=500, detail=str(e))
 
+# Health check/root endpoint
 @app.get("/")
 def root():
     print("[INFO] Root endpoint hit.", file=sys.stderr)

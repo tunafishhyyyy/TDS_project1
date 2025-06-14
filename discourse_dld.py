@@ -1,3 +1,10 @@
+"""
+discourse_dld.py
+Purpose: Scrapes Discourse forum topics and posts for a given course and date range, saving them as JSON files for downstream processing and embedding.
+- Authenticates using a session cookie, fetches topic and post data, and saves raw JSON for each topic.
+- Designed for use with IIT Madras TDS Discourse forums, but can be adapted for other Discourse-based forums.
+"""
+
 import requests
 import os
 import json

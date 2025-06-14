@@ -1,3 +1,4 @@
+# NOTE: This is just a test program and is not used in the main application.
 import chromadb
 import json
 # Load your embeddings from JSON

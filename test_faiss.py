@@ -1,3 +1,5 @@
+# NOTE: This is just a test program and is not used in the main application.
+
 import numpy as np
 import faiss
 import json
